@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Clock Tutor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one-screen tool. Big clock face beside a challenge card; stacks on phones. */
+:root {
+  --bg: #e9eef4;
+  --panel: #ffffff;
+  --face: #fdfdfb;
+  --rim: #23344d;
+  --ink: #1b2533;
+  --muted: #5d6b7e;
+  --tick: #8a97a8;
+  --minute: #1f6fd6;
+  --minute-soft: rgba(31, 111, 214, .16);
+  --hour: #1b2533;
+  --good: #187a4b;
+  --good-bg: #e2f4ea;
+  --bad: #b23a2a;
+  --bad-bg: #fbe8e4;
+  --line: #d3dbe5;
+  --font: "Lexend", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111821; --panel: #19222e; --face: #1f2a38; --rim: #9fb3cc; --ink: #e8edf3;
+    --muted: #9aa8b9; --tick: #6f7f93; --minute: #5aa2ff; --minute-soft: rgba(90, 162, 255, .2);
+    --hour: #e8edf3; --good: #5fd39a; --good-bg: #173327; --bad: #ff8a76; --bad-bg: #3a1f1b;
+    --line: #2c3a4b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111821; --panel: #19222e; --face: #1f2a38; --rim: #9fb3cc; --ink: #e8edf3;
+  --muted: #9aa8b9; --tick: #6f7f93; --minute: #5aa2ff; --minute-soft: rgba(90, 162, 255, .2);
+  --hour: #e8edf3; --good: #5fd39a; --good-bg: #173327; --bad: #ff8a76; --bad-bg: #3a1f1b;
+  --line: #2c3a4b; color-scheme: dark;
+}
+html, body { min-height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px;
+  padding: 24px 16px; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+.app {
+  max-width: 1040px; margin: 0 auto;
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 32px; align-items: center;
+}
+@media (max-width: 760px) { .app { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
+
+.clock-wrap { display: grid; justify-items: center; gap: 10px; }
+#clock {
+  width: min(100%, 480px, 70vh); aspect-ratio: 1; max-width: 100%;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+  border-radius: 50%; outline: none;
+}
+#clock.dragging { cursor: grabbing; }
+#clock:focus-visible { box-shadow: 0 0 0 4px var(--minute-soft), 0 0 0 6px var(--minute); }
+.hint { color: var(--muted); font-size: 14px; text-align: center; margin: 0; }
+
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+  padding: 24px; display: grid; gap: 20px; min-width: 0;
+}
+.eyebrow { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; font-weight: 500; }
+.challenge { font-size: clamp(22px, 3.2vw, 28px); font-weight: 500; line-height: 1.25; margin: 0; text-wrap: balance; }
+.challenge .target { font-weight: 700; color: var(--minute); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.levels { display: flex; flex-wrap: wrap; gap: 6px; }
+.levels button {
+  font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: transparent; color: var(--muted);
+}
+.levels button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn {
+  font: inherit; font-weight: 600; font-size: 16px; padding: 14px 22px; border-radius: 12px;
+  cursor: pointer; border: 2px solid transparent; transition: transform .08s ease;
+}
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible, .levels button:focus-visible, .toggle input:focus-visible { outline: 3px solid var(--minute); outline-offset: 2px; }
+.btn-primary { background: var(--minute); color: #fff; flex: 1 1 200px; }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+
+.feedback { border-radius: 12px; padding: 14px 16px; line-height: 1.5; font-size: 15px; }
+.feedback strong { display: block; font-size: 18px; margin-bottom: 2px; }
+.feedback { display: flex; gap: 14px; align-items: flex-start; }
+.feedback .fb-icon { flex: 0 0 44px; width: 44px; height: 44px; }
+.feedback .fb-text { min-width: 0; }
+.mark-x { stroke: var(--bad); stroke-width: 9; stroke-linecap: round; fill: none; }
+.mark-x-bg { fill: var(--bad-bg); stroke: var(--bad); stroke-width: 4; }
+#clockX { pointer-events: none; transform-origin: 0 0; transform-box: view-box; }
+#clockX.show { animation: popx .35s cubic-bezier(.3, 1.6, .5, 1) both; }
+@keyframes popx { from { transform: scale(.3); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { #clockX.show { animation: none; } }
+.feedback.good { background: var(--good-bg); color: var(--ink); }
+.feedback.good strong { color: var(--good); }
+.feedback.bad { background: var(--bad-bg); color: var(--ink); }
+.feedback.bad strong { color: var(--bad); }
+
+.footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; border-top: 1px solid var(--line); padding-top: 16px; font-size: 14px; color: var(--muted); }
+.score { font-variant-numeric: tabular-nums; }
+.score b { color: var(--ink); font-weight: 600; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--minute); margin: 0; }
+
+/* clock drawing */
+.c-face { fill: var(--face); stroke: var(--rim); stroke-width: 4; }
+.c-tick { stroke: var(--tick); stroke-width: 1; stroke-linecap: round; }
+.c-tick.major { stroke: var(--ink); stroke-width: 2.4; }
+.c-num { fill: var(--ink); font-family: var(--font); font-size: 15px; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+.c-min { fill: var(--minute); font-family: var(--font); font-size: 6.5px; font-weight: 500; text-anchor: middle; dominant-baseline: central; opacity: .85; }
+.c-hour { stroke: var(--hour); stroke-width: 6; stroke-linecap: round; }
+.c-minute { stroke: var(--minute); stroke-width: 4; stroke-linecap: round; }
+.c-knob { fill: var(--minute); }
+.c-ring { fill: var(--minute-soft); }
+.c-hub { fill: var(--ink); }
+.c-hub-in { fill: var(--minute); }
+.pulse { animation: pulse 1.6s ease-in-out infinite; transform-origin: 0 -78px; transform-box: view-box; }
+@keyframes pulse { 0%,100% { transform: scale(1); opacity: .9 } 50% { transform: scale(1.45); opacity: .35 } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+</style>
+
+</head>
+<body>
+<main class="app">
+  <div class="clock-wrap">
+    <svg id="clock" viewBox="-120 -120 240 240" role="slider" tabindex="0"
+         aria-label="Minute hand. Drag clockwise around the dial, or press the right arrow key."
+         aria-valuemin="0" aria-valuemax="719" aria-valuenow="0">
+      <circle class="c-face" r="100"></circle>
+      <g id="ticks"></g>
+      <g id="nums"></g>
+      <g id="minLabels"></g>
+      <line id="hourHand" class="c-hour" x1="0" y1="8" x2="0" y2="-50"></line>
+      <g id="minuteHand">
+        <line class="c-minute" x1="0" y1="12" x2="0" y2="-78"></line>
+        <circle id="ring" class="c-ring pulse" cx="0" cy="-78" r="11"></circle>
+        <circle class="c-knob" cx="0" cy="-78" r="6.5"></circle>
+      </g>
+      <circle class="c-hub" r="6"></circle>
+      <circle class="c-hub-in" r="2.4"></circle>
+      <g id="clockX" hidden>
+        <circle class="mark-x-bg" r="34" opacity=".92"></circle>
+        <path class="mark-x" d="M-15 -15 L15 15 M15 -15 L-15 15" stroke-width="7"></path>
+      </g>
+    </svg>
+    <p class="hint">Drag the blue minute hand clockwise round the dial. The hour hand follows.</p>
+  </div>
+
+  <section class="panel">
+    <div>
+      <p class="eyebrow">Your challenge</p>
+      <p class="challenge" id="challenge">Set the clock to show <span class="target">11:15</span></p>
+    </div>
+
+    <div>
+      <p class="eyebrow">Difficulty Level</p>
+      <div class="levels" id="levels" role="group" aria-label="Difficulty Level"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="checkBtn">Check my answer</button>
+      <button class="btn btn-ghost" id="showBtn" hidden>Show me</button>
+      <button class="btn btn-ghost" id="nextBtn" hidden>Next challenge</button>
+    </div>
+
+    <div id="feedback" class="feedback" aria-live="polite" hidden></div>
+
+    <div class="footer">
+      <span class="score" id="score"><b>0</b> right of <b>0</b> · streak <b>0</b></span>
+      <label class="toggle"><input type="checkbox" id="labelsToggle" checked> Show minute numbers</label>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const $ = id => document.getElementById(id);
+  const clock = $("clock"), minuteHand = $("minuteHand"), hourHand = $("hourHand"), ring = $("ring");
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- draw the dial ----------
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+  for (let i = 0; i < 60; i++) {
+    const a = i * Math.PI / 30, major = i % 5 === 0, r1 = major ? 86 : 91, r2 = 96;
+    el("line", { class: "c-tick" + (major ? " major" : ""), x1: r1 * Math.sin(a), y1: -r1 * Math.cos(a), x2: r2 * Math.sin(a), y2: -r2 * Math.cos(a) }, $("ticks"));
+  }
+  for (let h = 1; h <= 12; h++) {
+    const a = h * Math.PI / 6, r = 72;
+    el("text", { class: "c-num", x: r * Math.sin(a), y: -r * Math.cos(a) }, $("nums")).textContent = h;
+  }
+  for (let m = 0; m < 60; m += 5) {
+    const a = m * Math.PI / 30, r = 109;
+    el("text", { class: "c-min", x: r * Math.sin(a), y: -r * Math.cos(a) }, $("minLabels")).textContent = String(m).padStart(2, "0");
+  }
+  $("labelsToggle").addEventListener("change", e => { $("minLabels").style.display = e.target.checked ? "" : "none"; });
+
+  // ---------- clock state: total minutes since 12:00 (unbounded, so winding moves the hour hand) ----------
+  let t = 0;
+  const norm = m => ((Math.round(m) % 720) + 720) % 720;
+  const fmt = m => { const n = norm(m), h = Math.floor(n / 60) || 12, mm = n % 60; return h + ":" + String(mm).padStart(2, "0"); };
+
+  function render() {
+    minuteHand.setAttribute("transform", `rotate(${t * 6})`);
+    hourHand.setAttribute("transform", `rotate(${t * 0.5})`);
+    clock.setAttribute("aria-valuenow", norm(t));
+    clock.setAttribute("aria-valuetext", fmt(t));
+  }
+
+  let anim = null;
+  function animateTo(target, ms = 600) {
+    cancelAnimationFrame(anim);
+    if (reduceMotion || ms === 0) { t = target; render(); return Promise.resolve(); }
+    const from = t, start = performance.now();
+    return new Promise(res => {
+      const step = now => {
+        const p = Math.min(1, (now - start) / ms), e = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        t = from + (target - from) * e; render();
+        if (p < 1) anim = requestAnimationFrame(step); else res();
+      };
+      anim = requestAnimationFrame(step);
+    });
+  }
+
+  // ---------- dragging the minute hand ----------
+  const wrap = d => ((d + 540) % 360) - 180;
+  function pointerAngle(ev) {
+    const r = clock.getBoundingClientRect();
+    const x = (ev.clientX - r.left) / r.width * 240 - 120, y = (ev.clientY - r.top) / r.height * 240 - 120;
+    return { a: Math.atan2(x, -y) * 180 / Math.PI, d: Math.hypot(x, y) };
+  }
+  // The hand only turns clockwise: it follows the finger when the finger is ahead of it,
+  // and waits when the finger moves backwards. It steps in whole minutes, like a real clock.
+  let dragging = false, raw = 0;
+  function pushForward(a) {
+    const diff = wrap(a - raw * 6);
+    if (diff > 0) { raw += diff / 6; const next = Math.floor(raw + 1e-6); if (next !== t) { t = next; render(); } }
+  }
+  clock.addEventListener("pointerdown", ev => {
+    const { a, d } = pointerAngle(ev);
+    if (d > 118) return;
+    ev.preventDefault();
+    cancelAnimationFrame(anim);
+    dragging = true; clock.classList.add("dragging"); clock.setPointerCapture(ev.pointerId);
+    ring.classList.remove("pulse");
+    t = Math.ceil(t - 1e-6); raw = t;
+    if (d > 12) pushForward(a);
+    clearResult();
+  });
+  clock.addEventListener("pointermove", ev => {
+    if (!dragging) return;
+    const { a, d } = pointerAngle(ev);
+    if (d < 12) return; // too close to the centre to read a direction
+    pushForward(a);
+  });
+  const endDrag = () => { if (!dragging) return; dragging = false; clock.classList.remove("dragging"); };
+  clock.addEventListener("pointerup", endDrag);
+  clock.addEventListener("pointercancel", endDrag);
+
+  clock.addEventListener("keydown", ev => {
+    const step = ev.shiftKey ? 5 : 1;
+    let d = 0;
+    if (ev.key === "ArrowRight" || ev.key === "ArrowUp") d = step;
+    else if (ev.key === "PageUp") d = 15;
+    else if (ev.key === "Enter") { check(); ev.preventDefault(); return; }
+    else return;
+    ev.preventDefault(); ring.classList.remove("pulse"); clearResult();
+    cancelAnimationFrame(anim); t = Math.ceil(t - 1e-6) + d; render();
+  });
+
+  // ---------- challenges ----------
+  const LEVELS = [
+    { id: "oclock", name: "O'clock", steps: [0] },
+    { id: "half", name: "Half hours", steps: [0, 30] },
+    { id: "quarter", name: "Quarters", steps: [0, 15, 30, 45] },
+    { id: "five", name: "5 minutes", steps: Array.from({ length: 12 }, (_, i) => i * 5) },
+    { id: "any", name: "Any minute", steps: Array.from({ length: 60 }, (_, i) => i) },
+  ];
+  let level = LEVELS[2];
+  let target = 11 * 60 + 15; // first challenge: 11:15
+  let answered = false;
+  const stats = { right: 0, total: 0, streak: 0 };
+
+  const levelsBox = $("levels");
+  LEVELS.forEach(L => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = L.name; b.setAttribute("aria-pressed", L === level);
+    b.addEventListener("click", () => {
+      level = L;
+      [...levelsBox.children].forEach(c => c.setAttribute("aria-pressed", c === b));
+      newChallenge();
+    });
+    levelsBox.appendChild(b);
+  });
+
+  function newChallenge() {
+    let n, tries = 0;
+    do {
+      const h = 1 + Math.floor(Math.random() * 12);
+      const m = level.steps[Math.floor(Math.random() * level.steps.length)];
+      n = (h % 12) * 60 + m;
+    } while ((n === target || n === norm(t)) && ++tries < 50);
+    target = n; answered = false;
+    $("challenge").innerHTML = `Set the clock to show <span class="target">${fmt(target)}</span>`;
+    clearResult(true);
+  }
+
+  const HOUR_WORDS = ["twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+  function words(n) {
+    const h = Math.floor(n / 60) || 12, m = n % 60, next = h % 12 + 1;
+    if (m === 0) return `${HOUR_WORDS[h]} o'clock`;
+    if (m === 15) return `quarter past ${HOUR_WORDS[h]}`;
+    if (m === 30) return `half past ${HOUR_WORDS[h]}`;
+    if (m === 45) return `quarter to ${HOUR_WORDS[next]}`;
+    if (m < 30) return `${m} minute${m === 1 ? "" : "s"} past ${HOUR_WORDS[h]}`;
+    return `${60 - m} minute${60 - m === 1 ? "" : "s"} to ${HOUR_WORDS[next]}`;
+  }
+  function minuteSpot(m) {
+    const num = Math.floor(m / 5) || 12, extra = m % 5;
+    if (extra === 0) return `point straight at the ${num}`;
+    return `point ${extra} small mark${extra === 1 ? "" : "s"} past the ${num}`;
+  }
+  function hourSpot(n) {
+    const h = Math.floor(n / 60) || 12, m = n % 60, next = h % 12 + 1;
+    if (m === 0) return `point straight at the ${h}`;
+    if (m === 30) return `sit halfway between the ${h} and the ${next}`;
+    if (m < 30) return `sit just past the ${h}`;
+    return `sit most of the way from the ${h} to the ${next}`;
+  }
+
+  const fb = $("feedback");
+  const clockX = $("clockX");
+  function showClockX(on) {
+    clockX.classList.remove("show");
+    clockX.toggleAttribute("hidden", !on); // SVG elements have no .hidden property
+    if (on) { void clockX.getBBox(); clockX.classList.add("show"); }
+  }
+  function clearResult(force) {
+    showClockX(false);
+    if (!force && !fb.hidden && fb.classList.contains("good")) return;
+    fb.hidden = true; $("showBtn").hidden = true;
+    if (force) { $("nextBtn").hidden = true; $("checkBtn").hidden = false; }
+  }
+
+  function updateScore() {
+    $("score").innerHTML = `<b>${stats.right}</b> right of <b>${stats.total}</b> · streak <b>${stats.streak}</b>`;
+  }
+
+  function check() {
+    if (answered) { newChallenge(); return; }
+    t = Math.ceil(t - 1e-6); render();
+    const shown = norm(t);
+    stats.total++;
+    if (shown === target) {
+      stats.right++; stats.streak++; answered = true;
+      fb.className = "feedback good";
+      fb.innerHTML = `<div class="fb-text"><strong>Correct!</strong>The clock shows ${fmt(target)}, or ${words(target)}.</div>`;
+      $("checkBtn").hidden = true; $("showBtn").hidden = true; $("nextBtn").hidden = false;
+      $("nextBtn").focus();
+    } else {
+      stats.streak = 0;
+      const sm = shown % 60, tm = target % 60;
+      let tip;
+      if (sm === tm) tip = `The minute hand is in the right place. The hour hand should ${hourSpot(target)}. Keep turning the minute hand to move it there.`;
+      else if (Math.floor(shown / 60) === Math.floor(target / 60)) tip = `The hour is right. For :${String(tm).padStart(2, "0")}, the minute hand should ${minuteSpot(tm)}.`;
+      else tip = `For ${fmt(target)}, the minute hand should ${minuteSpot(tm)} and the hour hand should ${hourSpot(target)}.`;
+      fb.className = "feedback bad";
+      fb.innerHTML = `<svg class="fb-icon" viewBox="-24 -24 48 48" role="img" aria-label="Wrong"><circle class="mark-x-bg" r="21"></circle><path class="mark-x" d="M-8 -8 L8 8 M8 -8 L-8 8" stroke-width="5"></path></svg><div class="fb-text"><strong>Wrong.</strong>Your clock shows ${fmt(shown)}. ${tip}</div>`;
+      $("showBtn").hidden = false;
+      showClockX(true);
+    }
+    fb.hidden = false;
+    updateScore();
+  }
+
+  $("checkBtn").addEventListener("click", check);
+  $("nextBtn").addEventListener("click", () => { newChallenge(); clock.focus(); });
+  $("showBtn").addEventListener("click", async () => {
+    // always wind forward (clockwise), however far that is
+    const cur = Math.round(t);
+    const diff = ((target - norm(cur)) % 720 + 720) % 720;
+    $("showBtn").hidden = true;
+    showClockX(false);
+    await animateTo(cur + diff, Math.min(4500, 600 + diff * 5));
+    fb.className = "feedback good";
+    fb.innerHTML = `<div class="fb-text"><strong>Here it is.</strong>This is ${fmt(target)}, or ${words(target)}. The minute hand should ${minuteSpot(target % 60)}, and the hour hand should ${hourSpot(target)}.</div>`;
+    answered = true;
+    $("checkBtn").hidden = true; $("nextBtn").hidden = false;
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>
