@@ -106,6 +106,7 @@ body {
 .feedback.bad strong { color: var(--bad); }
 
 .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; border-top: 1px solid var(--line); padding-top: 16px; font-size: 14px; color: var(--muted); }
+.ver { font-size: 12px; opacity: .7; }
 .score { font-variant-numeric: tabular-nums; }
 .score b { color: var(--ink); font-weight: 600; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -177,6 +178,7 @@ body {
     <div class="footer">
       <span class="score" id="score"><b>0</b> right of <b>0</b> · streak <b>0</b></span>
       <label class="toggle"><input type="checkbox" id="labelsToggle" checked> Show minute numbers</label>
+      <span class="ver">v4</span>
     </div>
   </section>
 </main>
@@ -232,35 +234,40 @@ body {
   }
 
   // ---------- dragging the minute hand ----------
-  const wrap = d => ((d + 540) % 360) - 180;
+  const wrap = d => (((d % 360) + 540) % 360) - 180; // works for any size of angle, positive or negative
   function pointerAngle(ev) {
     const r = clock.getBoundingClientRect();
     const x = (ev.clientX - r.left) / r.width * 240 - 120, y = (ev.clientY - r.top) / r.height * 240 - 120;
     return { a: Math.atan2(x, -y) * 180 / Math.PI, d: Math.hypot(x, y) };
   }
-  // The hand only turns clockwise: it follows the finger when the finger is ahead of it,
-  // and waits when the finger moves backwards. It steps in whole minutes, like a real clock.
-  let dragging = false, raw = 0;
-  function pushForward(a) {
-    const diff = wrap(a - raw * 6);
-    if (diff > 0) { raw += diff / 6; const next = Math.floor(raw + 1e-6); if (next !== t) { t = next; render(); } }
+  // The hand only turns clockwise. Wherever the finger is on the dial, each clockwise
+  // movement of the finger turns the hand by the same angle; anticlockwise movement is ignored.
+  // Only the change since the last event is used, so the total can never confuse it.
+  // The hand steps in whole minutes, like a real clock.
+  let dragging = false, raw = 0, lastA = null;
+  function follow(a) {
+    if (lastA === null) { lastA = a; return; }
+    const delta = wrap(a - lastA);
+    lastA = a;
+    if (delta > 0) { raw += delta / 6; const next = Math.floor(raw + 1e-6); if (next !== t) { t = next; render(); } }
   }
   clock.addEventListener("pointerdown", ev => {
     const { a, d } = pointerAngle(ev);
     if (d > 118) return;
     ev.preventDefault();
     cancelAnimationFrame(anim);
-    dragging = true; clock.classList.add("dragging"); clock.setPointerCapture(ev.pointerId);
+    dragging = true; clock.classList.add("dragging");
+    try { clock.setPointerCapture(ev.pointerId); } catch (e) {}
     ring.classList.remove("pulse");
-    t = Math.ceil(t - 1e-6); raw = t;
-    if (d > 12) pushForward(a);
+    t = Math.ceil(t - 1e-6); raw = t; render();
+    lastA = d > 12 ? a : null;
     clearResult();
   });
   clock.addEventListener("pointermove", ev => {
     if (!dragging) return;
     const { a, d } = pointerAngle(ev);
-    if (d < 12) return; // too close to the centre to read a direction
-    pushForward(a);
+    if (d < 12) { lastA = null; return; } // too close to the centre to read a direction
+    follow(a);
   });
   const endDrag = () => { if (!dragging) return; dragging = false; clock.classList.remove("dragging"); };
   clock.addEventListener("pointerup", endDrag);
