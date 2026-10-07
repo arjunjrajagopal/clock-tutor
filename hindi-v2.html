@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>घड़ी ट्यूटर 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: level path across the top; clock beside (desktop) or between (phone) the task and the controls. */
+:root {
+  --bg: #e9eef4;
+  --panel: #ffffff;
+  --face: #fdfdfb;
+  --ink: #1b2533;
+  --muted: #5d6b7e;
+  --tick: #8a97a8;
+  --line: #d3dbe5;
+  --minute: #2f7de1;          /* replaced by the earned colour scheme */
+  --minute-soft: rgba(47, 125, 225, .18);
+  --good: #187a4b;
+  --good-bg: #e2f4ea;
+  --bad: #b23a2a;
+  --bad-bg: #fbe8e4;
+  --star: #f0b400;
+  --star-empty: #d8dee6;
+  --scrim: rgba(17, 24, 33, .55);
+  --font: "Lexend", "Noto Sans Devanagari", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111821; --panel: #19222e; --face: #1f2a38; --ink: #e8edf3; --muted: #9aa8b9; --tick: #6f7f93;
+    --line: #2c3a4b; --good: #5fd39a; --good-bg: #173327; --bad: #ff8a76; --bad-bg: #3a1f1b;
+    --star: #ffc933; --star-empty: #34435a; --scrim: rgba(0, 0, 0, .6); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111821; --panel: #19222e; --face: #1f2a38; --ink: #e8edf3; --muted: #9aa8b9; --tick: #6f7f93;
+  --line: #2c3a4b; --good: #5fd39a; --good-bg: #173327; --bad: #ff8a76; --bad-bg: #3a1f1b;
+  --star: #ffc933; --star-empty: #34435a; --scrim: rgba(0, 0, 0, .6); color-scheme: dark;
+}
+html, body { min-height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px;
+  padding-block: 16px 24px; padding-inline: 16px; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 3px solid var(--minute); outline-offset: 2px; }
+
+/* ---- level path ---- */
+.top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
+.path { position: relative; display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.path::before { content: ""; position: absolute; left: 24px; right: 24px; top: 21px; height: 3px; background: var(--line); border-radius: 2px; }
+.node { position: relative; z-index: 1; display: grid; justify-items: center; gap: 3px; width: 54px; padding: 0; background: none; border: 0; cursor: pointer; }
+.node:disabled { cursor: default; }
+.node .dot {
+  width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--panel); border: 3px solid var(--line); font-weight: 700; font-size: 17px; box-sizing: border-box;
+}
+.node.open .dot { border-color: var(--minute); color: var(--minute); }
+.node.current .dot { background: var(--minute); border-color: var(--minute); color: #fff; box-shadow: 0 0 0 4px var(--minute-soft); }
+.node:disabled .dot { color: var(--muted); }
+.node .lbl { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.node .mini { display: flex; gap: 1px; height: 10px; }
+.node .mini svg { width: 10px; height: 10px; }
+.swatches { display: flex; gap: 8px; align-items: center; }
+.swatch { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--ink); }
+
+/* ---- stage ---- */
+.stage {
+  display: grid; gap: 14px 32px; align-items: center;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-areas: "clock task" "clock controls";
+}
+@media (max-width: 760px) {
+  .stage { grid-template-columns: minmax(0, 1fr); grid-template-areas: "task" "clock" "controls"; }
+}
+.task { grid-area: task; display: grid; gap: 8px; justify-items: start; align-self: end; }
+.lvl { font-size: 13px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.ask { margin: 0; font-size: 17px; color: var(--muted); }
+.target { margin: 0; font-size: clamp(54px, 13vw, 76px); line-height: 1; font-weight: 700; color: var(--minute); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.dots { display: flex; gap: 8px; }
+.pd { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; box-sizing: border-box; transition: transform .2s; }
+.pd.now { border-color: var(--minute); border-width: 3px; }
+.pd.star { border-color: transparent; transform: scale(1.12); }
+.pd.done { border-color: var(--good); }
+.pd svg { width: 26px; height: 26px; }
+
+.clock-wrap { grid-area: clock; display: grid; justify-items: center; }
+#clock {
+  width: min(100%, 460px, 60vh); aspect-ratio: 1; max-width: 100%;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; border-radius: 50%; outline: none;
+}
+#clock.dragging { cursor: grabbing; }
+#clock:focus-visible { box-shadow: 0 0 0 4px var(--minute-soft), 0 0 0 6px var(--minute); }
+
+.controls { grid-area: controls; display: grid; gap: 12px; align-self: start; }
+.fb { min-height: 52px; display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 700; border-radius: 12px; padding: 4px 14px; box-sizing: border-box; font-variant-numeric: tabular-nums; }
+.fb.good { background: var(--good-bg); color: var(--good); }
+.fb.bad { background: var(--bad-bg); color: var(--bad); }
+.fb.info { background: var(--minute-soft); color: var(--ink); font-size: 20px; }
+.fb small { font-size: 16px; font-weight: 500; color: var(--ink); }
+.fb svg { width: 30px; height: 30px; flex: 0 0 30px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 20px; padding: 14px 22px; border-radius: 14px; cursor: pointer; border: 2px solid transparent; transition: transform .08s; }
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 24px; height: 24px; }
+.btn-primary { background: var(--minute); color: #fff; flex: 1 1 180px; }
+.btn-primary.nudge { animation: nudge 1s ease-in-out 3; }
+@keyframes nudge { 50% { box-shadow: 0 0 0 8px var(--minute-soft); } }
+.btn-ghost { background: var(--panel); color: var(--ink); border-color: var(--line); }
+
+.foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--minute); margin: 0; }
+.ver { font-size: 12px; opacity: .7; padding: 6px 4px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+
+/* ---- clock drawing ---- */
+.c-face { fill: var(--face); stroke: var(--minute); stroke-width: 5; transition: stroke .4s; }
+.c-tick { stroke: var(--tick); stroke-width: 1; stroke-linecap: round; }
+.c-tick.major { stroke: var(--ink); stroke-width: 2.4; }
+.c-num { fill: var(--ink); font-family: var(--font); font-size: 15px; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+.c-min { fill: var(--minute); font-family: var(--font); font-size: 6.5px; font-weight: 500; text-anchor: middle; dominant-baseline: central; opacity: .85; }
+.c-hour { stroke: var(--ink); stroke-width: 6; stroke-linecap: round; }
+.c-minute { stroke: var(--minute); stroke-width: 4; stroke-linecap: round; }
+.c-knob { fill: var(--minute); }
+.c-ring { fill: var(--minute-soft); }
+.c-hub { fill: var(--ink); }
+.c-hub-in { fill: var(--minute); }
+.hint-arc { fill: none; stroke: var(--minute); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 6 7; animation: crawl 1s linear infinite; }
+.hint-head { fill: var(--minute); }
+@keyframes crawl { to { stroke-dashoffset: -13; } }
+.pulse { animation: pulse 1.4s ease-in-out infinite; transform-origin: 0 -78px; transform-box: view-box; }
+@keyframes pulse { 0%,100% { transform: scale(1); opacity: .9 } 50% { transform: scale(1.6); opacity: .3 } }
+.mark-x { stroke: var(--bad); stroke-linecap: round; fill: none; }
+.mark-x-bg { fill: var(--bad-bg); stroke: var(--bad); stroke-width: 4; }
+.mark-ok { stroke: var(--good); stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.mark-ok-bg { fill: var(--good-bg); stroke: var(--good); stroke-width: 4; }
+#clockMark { pointer-events: none; transform-origin: 0 0; transform-box: view-box; }
+#clockMark.show { animation: popx .35s cubic-bezier(.3, 1.6, .5, 1) both; }
+@keyframes popx { from { transform: scale(.3); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+
+.fly { position: fixed; left: 0; top: 0; width: 40px; height: 40px; margin: -20px 0 0 -20px; pointer-events: none; z-index: 30; }
+
+/* ---- overlays ---- */
+.overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: var(--scrim); padding: 16px; }
+#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 41; }
+.card {
+  position: relative; z-index: 42; background: var(--panel); border-radius: 22px; padding: 28px 24px; width: min(100%, 380px); box-sizing: border-box;
+  display: grid; gap: 14px; justify-items: center; text-align: center;
+  animation: popx .4s cubic-bezier(.3, 1.4, .5, 1) both;
+}
+.card h2 { margin: 0; font-size: 30px; }
+.card p { margin: 0; font-size: 20px; }
+.card .sub { font-size: 16px; color: var(--muted); }
+.bigstars { display: flex; gap: 6px; }
+.bigstars svg { width: 58px; height: 58px; }
+.bigstars svg.on { animation: popx .45s cubic-bezier(.3, 1.6, .5, 1) both; }
+.newcolor { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; }
+.newcolor span { width: 34px; height: 34px; border-radius: 50%; display: inline-block; }
+.card .btn { width: 100%; }
+@media (prefers-reduced-motion: reduce) {
+  .pulse, .hint-arc, .btn-primary.nudge, #clockMark.show, .card, .bigstars svg.on { animation: none; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <ol class="path" id="path" aria-label="स्तर"></ol>
+    <div class="swatches" id="swatches" aria-label="घड़ी का रंग"></div>
+  </header>
+
+  <main class="stage">
+    <div class="task">
+      <span class="lvl" id="lvlName">स्तर 1 · पूरे घंटे</span>
+      <p class="ask">घड़ी में यह समय लगाइए</p>
+      <p class="target" id="target">3:00</p>
+      <div class="dots" id="dots" aria-label="इस राउंड में"></div>
+    </div>
+
+    <div class="clock-wrap">
+      <svg id="clock" viewBox="-120 -120 240 240" role="slider" tabindex="0"
+           aria-label="मिनट वाला काँटा। इसे घड़ी की दिशा में घुमाइए, या दायाँ तीर दबाइए।"
+           aria-valuemin="0" aria-valuemax="719" aria-valuenow="0">
+        <defs>
+          <symbol id="starShape" viewBox="-12 -12 24 24"><path d="M0 -11 L3.2 -3.6 L11 -3.4 L4.9 1.6 L7 9.4 L0 5 L-7 9.4 L-4.9 1.6 L-11 -3.4 L-3.2 -3.6 Z"/></symbol>
+        </defs>
+        <circle class="c-face" r="100"></circle>
+        <g id="ticks"></g>
+        <g id="nums"></g>
+        <g id="minLabels"></g>
+        <g id="hint">
+          <path class="hint-arc" d="M22 -52 A57 57 0 0 1 56 -12"></path>
+          <path class="hint-head" d="M48 -14 L60 -2 L63 -18 Z"></path>
+        </g>
+        <line id="hourHand" class="c-hour" x1="0" y1="8" x2="0" y2="-50"></line>
+        <g id="minuteHand">
+          <line class="c-minute" x1="0" y1="12" x2="0" y2="-78"></line>
+          <circle id="ring" class="c-ring pulse" cx="0" cy="-78" r="11"></circle>
+          <circle class="c-knob" cx="0" cy="-78" r="6.5"></circle>
+        </g>
+        <circle class="c-hub" r="6"></circle>
+        <circle class="c-hub-in" r="2.4"></circle>
+        <g id="clockMark" hidden></g>
+      </svg>
+    </div>
+
+    <div class="controls">
+      <div class="fb" id="fb" aria-live="polite"></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="checkBtn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 L10 17.5 L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          जाँचें
+        </button>
+        <button class="btn btn-ghost" id="showBtn" type="button" hidden>दिखाएँ</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <label class="toggle"><input type="checkbox" id="labelsToggle" checked> मिनट के अंक</label>
+    <span class="ver" id="ver" title="नया शुरू करने के लिए दबाकर रखें">v6</span>
+  </footer>
+</div>
+
+<div class="overlay" id="roundOver" hidden>
+  <canvas id="confetti"></canvas>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+    <h2 id="ovTitle">राउंड पूरा!</h2>
+    <div class="bigstars" id="ovStars"></div>
+    <p id="ovMsg"></p>
+    <div class="newcolor" id="ovColor" hidden><span></span> नया रंग!</div>
+    <p class="sub" id="ovSub"></p>
+    <button class="btn btn-primary" id="ovBtn" type="button">आगे</button>
+  </div>
+</div>
+
+<div class="overlay" id="resetOver" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="rsTitle">
+    <h2 id="rsTitle">शुरू से?</h2>
+    <p class="sub">सारे स्टार और रंग मिट जाएँगे।</p>
+    <button class="btn btn-primary" id="rsYes" type="button" style="background: var(--bad)">हाँ, मिटाएँ</button>
+    <button class="btn btn-ghost" id="rsNo" type="button">नहीं</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const $ = id => document.getElementById(id);
+  const clock = $("clock"), minuteHand = $("minuteHand"), hourHand = $("hourHand"), ring = $("ring"), hint = $("hint");
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.documentElement.lang = "hi";
+
+  // ================= settings =================
+  const LEVELS = [
+    { name: "पूरे घंटे", short: "घंटे", steps: [0] },
+    { name: "आधे घंटे", short: "आधे", steps: [0, 30] },
+    { name: "सवा, साढ़े, पौने", short: "सवा", steps: [0, 15, 30, 45] },
+    { name: "5 मिनट", short: "5 मिनट", steps: Array.from({ length: 12 }, (_, i) => i * 5) },
+    { name: "कोई भी मिनट", short: "हर मिनट", steps: Array.from({ length: 60 }, (_, i) => i) },
+  ];
+  // colour 0 at the start, colours 1–4 for unlocking levels 2–5, gold (5) for finishing level 5
+  const SCHEMES = ["#2f7de1", "#1f9d55", "#d9650a", "#8b5cf6", "#e0447a", "#b88400"];
+  const PRAISE = ["शाबाश!", "बहुत अच्छे!", "बढ़िया!", "सही!"];
+  const ROUND = 5;
+
+  // ================= saved progress (on this phone only) =================
+  const KEY = "clockTutorV2";
+  const DEFAULTS = { unlocked: 0, best: [0, 0, 0, 0, 0], mastered: false, mixBest: 0, level: 0, mix: false, scheme: 0, hinted: false, labels: true };
+  const fresh = () => JSON.parse(JSON.stringify(DEFAULTS));
+  function load() {
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === "object") return Object.assign(fresh(), s); } catch (e) {}
+    return fresh();
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(P)); } catch (e) {} }
+  let P = load();
+  const earned = () => { const list = []; for (let i = 0; i <= P.unlocked; i++) list.push(i); if (P.mastered) list.push(5); return list; };
+
+  // ================= draw the dial =================
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  for (let i = 0; i < 60; i++) {
+    const a = i * Math.PI / 30, major = i % 5 === 0, r1 = major ? 86 : 91, r2 = 96;
+    el("line", { class: "c-tick" + (major ? " major" : ""), x1: r1 * Math.sin(a), y1: -r1 * Math.cos(a), x2: r2 * Math.sin(a), y2: -r2 * Math.cos(a) }, $("ticks"));
+  }
+  for (let h = 1; h <= 12; h++) {
+    const a = h * Math.PI / 6;
+    el("text", { class: "c-num", x: 72 * Math.sin(a), y: -72 * Math.cos(a) }, $("nums")).textContent = h;
+  }
+  for (let m = 0; m < 60; m += 5) {
+    const a = m * Math.PI / 30;
+    el("text", { class: "c-min", x: 109 * Math.sin(a), y: -109 * Math.cos(a) }, $("minLabels")).textContent = String(m).padStart(2, "0");
+  }
+  const labelsToggle = $("labelsToggle");
+  function applyLabels() { labelsToggle.checked = P.labels; $("minLabels").style.display = P.labels ? "" : "none"; }
+  labelsToggle.addEventListener("change", () => { P.labels = labelsToggle.checked; save(); applyLabels(); });
+
+  // small reusable icons
+  const starSvg = (fill, size) => `<svg viewBox="-12 -12 24 24" width="${size}" height="${size}" aria-hidden="true"><path fill="${fill}" d="M0 -11 L3.2 -3.6 L11 -3.4 L4.9 1.6 L7 9.4 L0 5 L-7 9.4 L-4.9 1.6 L-11 -3.4 L-3.2 -3.6 Z"/></svg>`;
+  const tickSvg = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 L10 17.5 L19 7" fill="none" stroke="var(--good)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const crossSvg = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 L18 18 M18 6 L6 18" fill="none" stroke="var(--bad)" stroke-width="3.2" stroke-linecap="round"/></svg>`;
+  const lockSvg = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11 V8 a4 4 0 0 1 8 0 V11" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>`;
+
+  // ================= colour scheme =================
+  function applyScheme() {
+    if (!earned().includes(P.scheme)) P.scheme = 0;
+    const c = SCHEMES[P.scheme];
+    const root = document.documentElement.style;
+    root.setProperty("--minute", c);
+    root.setProperty("--minute-soft", c + "2e");
+    renderSwatches();
+  }
+  function renderSwatches() {
+    const box = $("swatches"); box.innerHTML = "";
+    earned().forEach(i => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "swatch"; b.style.background = SCHEMES[i];
+      b.setAttribute("aria-label", "रंग " + (i + 1)); b.setAttribute("aria-pressed", i === P.scheme);
+      b.addEventListener("click", () => { P.scheme = i; save(); applyScheme(); });
+      box.appendChild(b);
+    });
+  }
+
+  // ================= clock state =================
+  let t = 0; // minutes since 12:00, unbounded so winding moves the hour hand
+  const norm = m => ((Math.round(m) % 720) + 720) % 720;
+  const fmt = m => { const n = norm(m), h = Math.floor(n / 60) || 12; return h + ":" + String(n % 60).padStart(2, "0"); };
+  function render() {
+    minuteHand.setAttribute("transform", `rotate(${t * 6})`);
+    hourHand.setAttribute("transform", `rotate(${t * 0.5})`);
+    hint.setAttribute("transform", `rotate(${t * 6})`);
+    clock.setAttribute("aria-valuenow", norm(t));
+    clock.setAttribute("aria-valuetext", fmt(t));
+  }
+  let anim = null;
+  function animateTo(target, ms) {
+    cancelAnimationFrame(anim);
+    if (reduceMotion) { t = target; render(); return Promise.resolve(); }
+    const from = t, start = performance.now();
+    return new Promise(res => {
+      const step = now => {
+        const p = Math.min(1, (now - start) / ms), e = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        t = from + (target - from) * e; render();
+        if (p < 1) anim = requestAnimationFrame(step); else res();
+      };
+      anim = requestAnimationFrame(step);
+    });
+  }
+
+  // ================= dragging: clockwise only =================
+  // Each clockwise movement of the finger turns the hand by the same angle; anticlockwise is ignored.
+  const wrap = d => (((d % 360) + 540) % 360) - 180;
+  function pointerAngle(ev) {
+    const r = clock.getBoundingClientRect();
+    const x = (ev.clientX - r.left) / r.width * 240 - 120, y = (ev.clientY - r.top) / r.height * 240 - 120;
+    return { a: Math.atan2(x, -y) * 180 / Math.PI, d: Math.hypot(x, y) };
+  }
+  let dragging = false, raw = 0, lastA = null;
+  function moved() {
+    if (!P.hinted) { P.hinted = true; save(); hint.setAttribute("hidden", ""); ring.classList.remove("pulse"); }
+    clearMark();
+  }
+  function follow(a) {
+    if (lastA === null) { lastA = a; return; }
+    const delta = wrap(a - lastA); lastA = a;
+    if (delta > 0) { raw += delta / 6; const next = Math.floor(raw + 1e-6); if (next !== t) { t = next; render(); moved(); } }
+  }
+  clock.addEventListener("pointerdown", ev => {
+    if (busy) return;
+    const { a, d } = pointerAngle(ev);
+    if (d > 118) return;
+    ev.preventDefault(); audio();
+    cancelAnimationFrame(anim);
+    dragging = true; clock.classList.add("dragging");
+    try { clock.setPointerCapture(ev.pointerId); } catch (e) {}
+    t = Math.ceil(t - 1e-6); raw = t; render();
+    lastA = d > 12 ? a : null;
+  });
+  clock.addEventListener("pointermove", ev => {
+    if (!dragging) return;
+    const { a, d } = pointerAngle(ev);
+    if (d < 12) { lastA = null; return; }
+    follow(a);
+  });
+  const endDrag = () => { if (!dragging) return; dragging = false; clock.classList.remove("dragging"); };
+  clock.addEventListener("pointerup", endDrag);
+  clock.addEventListener("pointercancel", endDrag);
+  clock.addEventListener("keydown", ev => {
+    if (busy) return;
+    let d = 0;
+    if (ev.key === "ArrowRight" || ev.key === "ArrowUp") d = ev.shiftKey ? 5 : 1;
+    else if (ev.key === "PageUp") d = 15;
+    else if (ev.key === "Enter") { ev.preventDefault(); check(); return; }
+    else return;
+    ev.preventDefault(); cancelAnimationFrame(anim);
+    t = Math.ceil(t - 1e-6) + d; render(); moved();
+  });
+
+  // ================= sound =================
+  let ac = null;
+  function audio() {
+    try {
+      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+    } catch (e) { ac = null; }
+    return ac;
+  }
+  function chime(big) {
+    const a = audio(); if (!a) return;
+    const notes = big ? [659.3, 830.6, 987.8, 1318.5] : [880, 1318.5];
+    notes.forEach((f, i) => {
+      const o = a.createOscillator(), g = a.createGain(), st = a.currentTime + i * (big ? 0.12 : 0.09);
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, st); g.gain.linearRampToValueAtTime(0.16, st + 0.015); g.gain.exponentialRampToValueAtTime(0.001, st + 0.7);
+      o.connect(g); g.connect(a.destination); o.start(st); o.stop(st + 0.75);
+    });
+  }
+
+  // ================= marks on the clock =================
+  const mark = $("clockMark");
+  function showMark(ok) {
+    mark.innerHTML = ok
+      ? `<circle class="mark-ok-bg" r="30"/><path class="mark-ok" stroke-width="7" d="M-13 1 L-4 10 L14 -9"/>`
+      : `<circle class="mark-x-bg" r="30"/><path class="mark-x" stroke-width="7" d="M-12 -12 L12 12 M12 -12 L-12 12"/>`;
+    mark.classList.remove("show"); mark.removeAttribute("hidden");
+    void mark.getBBox(); mark.classList.add("show");
+  }
+  function clearMark() { mark.setAttribute("hidden", ""); }
+
+  // ================= rounds =================
+  let R = null, cur = null, busy = false;
+  const fb = $("fb");
+  function setFb(cls, html) { fb.className = "fb" + (cls ? " " + cls : ""); fb.innerHTML = html; }
+
+  function makeTarget(lv, avoid) {
+    for (let k = 0; k < 100; k++) {
+      const L = LEVELS[lv], h = 1 + Math.floor(Math.random() * 12);
+      const n = (h % 12) * 60 + L.steps[Math.floor(Math.random() * L.steps.length)];
+      if (!avoid.includes(n)) return n;
+    }
+    return 0;
+  }
+  function startRound(level, mix) {
+    hideOverlay();
+    const levels = Array.from({ length: ROUND }, () => mix ? Math.floor(Math.random() * 5) : level);
+    const targets = [];
+    levels.forEach(lv => targets.push(makeTarget(lv, targets)));
+    R = { level, mix, levels, targets, i: 0, first: 0, res: [] };
+    P.level = level; P.mix = mix; save();
+    $("lvlName").textContent = mix ? "अभ्यास · सब स्तर" : `स्तर ${level + 1} · ${LEVELS[level].name}`;
+    renderPath(); setChallenge();
+  }
+  function setChallenge() {
+    if (R.targets[R.i] === norm(t)) R.targets[R.i] = makeTarget(R.levels[R.i], [norm(t), ...R.targets]);
+    cur = { target: R.targets[R.i], wrong: 0 };
+    $("target").textContent = fmt(cur.target);
+    $("showBtn").hidden = true; $("checkBtn").classList.remove("nudge");
+    setFb("", ""); clearMark(); busy = false;
+    renderDots();
+  }
+  function renderDots() {
+    const box = $("dots"); box.innerHTML = "";
+    for (let i = 0; i < ROUND; i++) {
+      const s = document.createElement("span");
+      const r = R.res[i];
+      s.className = "pd" + (r ? " " + r : i === R.i ? " now" : "");
+      s.innerHTML = r === "star" ? starSvg("var(--star)", 26) : r === "done" ? tickSvg : "";
+      box.appendChild(s);
+    }
+  }
+
+  function check() {
+    if (busy || !R) return;
+    audio();
+    cancelAnimationFrame(anim);
+    t = Math.ceil(t - 1e-6); render();
+    const shown = norm(t);
+    if (shown === cur.target) {
+      busy = true;
+      const first = cur.wrong === 0;
+      if (first) R.first++;
+      R.res[R.i] = first ? "star" : "done";
+      setFb("good", `${tickSvg}${PRAISE[Math.floor(Math.random() * PRAISE.length)]}`);
+      showMark(true); chime(false);
+      $("showBtn").hidden = true; $("checkBtn").classList.remove("nudge");
+      const dot = $("dots").children[R.i];
+      const finish = () => { renderDots(); setTimeout(next, first ? 450 : 700); };
+      if (first && !reduceMotion) flyStar(dot, finish); else finish();
+    } else {
+      cur.wrong++;
+      setFb("bad", `${crossSvg}${fmt(shown)} <small>फिर से</small>`);
+      showMark(false);
+      if (cur.wrong >= 2) $("showBtn").hidden = false;
+    }
+  }
+  function flyStar(dot, done) {
+    const c = clock.getBoundingClientRect(), d = dot.getBoundingClientRect();
+    const x0 = c.left + c.width / 2, y0 = c.top + c.height / 2, x1 = d.left + d.width / 2, y1 = d.top + d.height / 2;
+    const f = document.createElement("div"); f.className = "fly"; f.innerHTML = starSvg("var(--star)", 40);
+    document.body.appendChild(f);
+    const a = f.animate([
+      { transform: `translate(${x0}px, ${y0}px) scale(.4) rotate(0deg)`, opacity: 0 },
+      { transform: `translate(${x0}px, ${y0 - 30}px) scale(1.8) rotate(40deg)`, opacity: 1, offset: .3 },
+      { transform: `translate(${x1}px, ${y1}px) scale(.75) rotate(144deg)`, opacity: 1 },
+    ], { duration: 750, easing: "cubic-bezier(.45, 0, .25, 1)" });
+    a.onfinish = () => { f.remove(); done(); };
+  }
+  function next() {
+    R.i++;
+    if (R.i < ROUND) setChallenge(); else endRound();
+  }
+
+  $("checkBtn").addEventListener("click", check);
+  $("showBtn").addEventListener("click", async () => {
+    if (busy) return;
+    busy = true; clearMark(); $("showBtn").hidden = true;
+    const curT = Math.ceil(t - 1e-6);
+    const diff = ((cur.target - norm(curT)) % 720 + 720) % 720; // always forwards
+    await animateTo(curT + diff, Math.min(4500, 600 + diff * 5));
+    t = curT + diff; render();
+    cur.wrong = Math.max(cur.wrong, 2);
+    busy = false;
+    setFb("info", "अब जाँचें");
+    $("checkBtn").classList.add("nudge");
+  });
+
+  // ================= end of round: stars, adaptive level, rewards =================
+  function endRound() {
+    busy = true;
+    const n = R.first, stars = n === ROUND ? 3 : n === ROUND - 1 ? 2 : 1;
+    let outcome, nextLevel = R.level, nextMix = R.mix, newColour = null;
+    if (R.mix) {
+      P.mixBest = Math.max(P.mixBest, stars);
+      outcome = stars === 3 ? "perfect" : stars === 2 ? "again" : "mixlow";
+    } else {
+      P.best[R.level] = Math.max(P.best[R.level], stars);
+      if (n === ROUND) {
+        if (R.level === 4) {
+          if (!P.mastered) { P.mastered = true; newColour = 5; outcome = "master"; } else outcome = "perfect";
+          nextMix = true;
+        } else {
+          if (R.level === P.unlocked) { P.unlocked++; newColour = P.unlocked; outcome = "unlock"; } else outcome = "perfect";
+          nextLevel = R.level + 1;
+        }
+      } else if (n >= 3 || R.level === 0) {
+        outcome = "again";
+      } else {
+        outcome = "easier"; nextLevel = R.level - 1;
+      }
+    }
+    if (newColour !== null) P.scheme = newColour;
+    P.level = nextLevel; P.mix = nextMix;
+    save(); applyScheme(); renderPath();
+    showOverlay(stars, outcome, nextLevel, nextMix, newColour);
+  }
+
+  const MSG = {
+    unlock: "नया स्तर खुला!",
+    master: "सोने की घड़ी मिली!",
+    perfect: "शानदार!",
+    again: "अच्छा! एक बार और",
+    easier: "थोड़ा आसान करते हैं",
+    mixlow: "एक बार और",
+  };
+  function showOverlay(stars, outcome, nextLevel, nextMix, newColour) {
+    $("ovTitle").textContent = outcome === "master" ? "आप जीत गए!" : "राउंड पूरा!";
+    const sb = $("ovStars"); sb.innerHTML = "";
+    for (let i = 0; i < 3; i++) {
+      sb.insertAdjacentHTML("beforeend", starSvg(i < stars ? "var(--star)" : "var(--star-empty)", 58));
+      const s = sb.lastElementChild;
+      if (i < stars) { s.classList.add("on"); s.style.animationDelay = (0.15 + i * 0.18) + "s"; }
+    }
+    $("ovMsg").textContent = MSG[outcome];
+    const nc = $("ovColor");
+    nc.hidden = newColour === null;
+    if (newColour !== null) nc.querySelector("span").style.background = SCHEMES[newColour];
+    $("ovSub").textContent = nextMix ? "अगला: अभ्यास" : "अगला: " + LEVELS[nextLevel].name;
+    $("ovBtn").textContent = outcome === "master" ? "अभ्यास करें" : "आगे";
+    $("ovBtn").onclick = () => startRound(nextLevel, nextMix);
+    $("roundOver").hidden = false;
+    $("ovBtn").focus();
+    const big = outcome === "unlock" || outcome === "master" || stars === 3;
+    chime(true);
+    confetti(big ? 180 : 70, outcome === "master");
+  }
+  function hideOverlay() { $("roundOver").hidden = true; stopConfetti(); }
+
+  // ================= confetti =================
+  let confettiRun = null;
+  function confetti(count, gold) {
+    stopConfetti();
+    if (reduceMotion) return;
+    const cv = $("confetti"), ctx = cv.getContext("2d"), dpr = window.devicePixelRatio || 1;
+    const W = cv.clientWidth, H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.scale(dpr, dpr);
+    const colours = gold ? ["#f0b400", "#ffd84d", "#b88400", "#fff3b0"] : [SCHEMES[P.scheme], "#f0b400", "#1f9d55", "#e0447a", "#2f7de1", "#8b5cf6"];
+    const parts = Array.from({ length: count }, () => ({
+      x: W / 2 + (Math.random() - .5) * W * .3, y: H * .45,
+      vx: (Math.random() - .5) * 14, vy: -6 - Math.random() * 12,
+      r: Math.random() * Math.PI, vr: (Math.random() - .5) * .3,
+      w: 6 + Math.random() * 6, h: 4 + Math.random() * 6, c: colours[Math.floor(Math.random() * colours.length)],
+    }));
+    const start = performance.now();
+    const frame = now => {
+      ctx.clearRect(0, 0, W, H);
+      let alive = 0;
+      parts.forEach(p => {
+        p.vy += 0.32; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        if (p.y < H + 20) alive++;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
+      });
+      if (alive && now - start < 5000) confettiRun = requestAnimationFrame(frame); else ctx.clearRect(0, 0, W, H);
+    };
+    confettiRun = requestAnimationFrame(frame);
+  }
+  function stopConfetti() { cancelAnimationFrame(confettiRun); const cv = $("confetti"); cv.getContext("2d").clearRect(0, 0, cv.width, cv.height); }
+
+  // ================= level path =================
+  function renderPath() {
+    const ol = $("path"); ol.innerHTML = "";
+    const items = LEVELS.map((L, i) => ({ i, label: L.short, name: L.name, open: i <= P.unlocked, best: P.best[i] }));
+    if (P.mastered) items.push({ i: "mix", label: "अभ्यास", name: "अभ्यास", open: true, best: P.mixBest });
+    items.forEach(it => {
+      const li = document.createElement("li"), b = document.createElement("button");
+      const isCur = R && (it.i === "mix" ? R.mix : !R.mix && R.level === it.i);
+      b.type = "button"; b.className = "node" + (it.open ? " open" : "") + (isCur ? " current" : "");
+      b.disabled = !it.open;
+      b.setAttribute("aria-label", it.open ? `${it.name}, ${it.best} स्टार` : `${it.name}, बंद`);
+      const face = !it.open ? lockSvg : it.i === "mix" ? starSvg("currentColor", 20) : it.i + 1;
+      let mini = "";
+      for (let k = 0; k < 3; k++) mini += starSvg(k < it.best ? "var(--star)" : "var(--star-empty)", 10);
+      b.innerHTML = `<span class="dot">${face}</span><span class="lbl">${it.label}</span><span class="mini">${mini}</span>`;
+      if (it.open) b.addEventListener("click", () => { if (busy) return; it.i === "mix" ? startRound(4, true) : startRound(it.i, false); });
+      li.appendChild(b); ol.appendChild(li);
+    });
+  }
+
+  // ================= hidden reset: press and hold the version label =================
+  let holdTimer = null;
+  const ver = $("ver");
+  ver.addEventListener("pointerdown", () => { holdTimer = setTimeout(() => { $("resetOver").hidden = false; $("rsNo").focus(); }, 1500); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(e => ver.addEventListener(e, () => clearTimeout(holdTimer)));
+  ver.addEventListener("contextmenu", e => e.preventDefault());
+  $("rsNo").addEventListener("click", () => { $("resetOver").hidden = true; });
+  $("rsYes").addEventListener("click", () => {
+    $("resetOver").hidden = true;
+    P = fresh(); save();
+    t = 0; render(); hint.removeAttribute("hidden"); ring.classList.add("pulse");
+    applyScheme(); applyLabels(); startRound(0, false);
+  });
+
+  // ================= start =================
+  applyScheme(); applyLabels();
+  if (P.hinted) { hint.setAttribute("hidden", ""); ring.classList.remove("pulse"); }
+  render();
+  startRound(P.mix ? 4 : Math.min(P.level, P.unlocked), P.mix && P.mastered);
+})();
+</script>
+
+</body>
+</html>
